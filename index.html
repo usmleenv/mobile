@@ -2100,6 +2100,10 @@
                 lastCheckedChoice = questionData[questionId]?.selectedAnswer || '';
             }
 
+            // Reset the last checked result for validation polling
+            // Set to empty string so next validation will be detected
+            lastCheckedResult = '';
+
             // Update navigation buttons
             document.getElementById('prevBtn').disabled = index === 0;
             document.getElementById('nextBtn').disabled = index === currentQuestions.length - 1;
@@ -2292,6 +2296,63 @@
 
         // Check every 500ms for changes
         setInterval(checkIframeChoice, 500);
+
+        // Check for answer validation from iframe
+        let lastCheckedResult = '';
+
+        function checkAnswerValidation() {
+            if (!currentQuestions || currentQuestions.length === 0) return;
+
+            const questionId = currentQuestions[currentQuestionIndex];
+            const resultKey = 'result_q' + questionId;
+            const currentResult = localStorage.getItem(resultKey) || '';
+
+            if (currentResult && currentResult !== lastCheckedResult) {
+                lastCheckedResult = currentResult;
+
+                // Auto-mark correct or incorrect button
+                if (!questionData[questionId]) {
+                    questionData[questionId] = {
+                        isFlagged: false,
+                        isCorrect: false,
+                        isIncorrect: false,
+                        attempts: 0,
+                        lastAttempted: new Date().toISOString(),
+                        selectedAnswer: ''
+                    };
+                }
+
+                if (currentResult === 'correct') {
+                    questionData[questionId].isCorrect = true;
+                    questionData[questionId].isIncorrect = false;
+                } else if (currentResult === 'incorrect') {
+                    questionData[questionId].isCorrect = false;
+                    questionData[questionId].isIncorrect = true;
+                }
+
+                saveQuestionData();
+
+                // Update button UI
+                const correctBtn = document.getElementById('correctBtn');
+                const incorrectBtn = document.getElementById('incorrectBtn');
+
+                if (currentResult === 'correct') {
+                    correctBtn.classList.add('correct');
+                    incorrectBtn.classList.remove('incorrect');
+                } else {
+                    correctBtn.classList.remove('correct');
+                    incorrectBtn.classList.add('incorrect');
+                }
+
+                // Update sidebar (always update, not just when open)
+                renderQuestionsList();
+
+                console.log(`Auto-marked as ${currentResult} for question ${questionId}`);
+            }
+        }
+
+        // Check every 500ms for answer validation
+        setInterval(checkAnswerValidation, 500);
 
         // Get all valid question IDs from topics
         function getAllValidQuestionIds() {

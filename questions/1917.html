@@ -681,6 +681,60 @@ summary {
         }
     }
 
+
+    
+
+
+    
+
+    /* Adjust table padding to make room for radio button */
+    
+
+
+    /* Clickable Answer Choices */
+    table tr.answer-choice {
+        cursor: pointer !important;
+        transition: all 0.3s ease !important;
+    }
+
+    table tr.answer-choice:hover {
+        background: #f8f9fa !important;
+    }
+
+    table tr.answer-choice td:first-child {
+        position: relative !important;
+        padding-left: 35px !important;
+    }
+
+    table tr.answer-choice td:first-child::before {
+        content: '';
+        position: absolute;
+        left: 8px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 16px;
+        height: 16px;
+        border: 2px solid #999;
+        border-radius: 50%;
+        background: white;
+        transition: all 0.2s ease;
+        box-sizing: border-box;
+    }
+
+    table tr.answer-choice.selected td:first-child::before {
+        border-color: #1a73e8;
+        border-width: 5px;
+    }
+
+    table tr.answer-choice.selected {
+        background: #e8f4ff !important;
+    }
+
+    table tr.answer-choice.selected td:first-child {
+        color: #1a73e8 !important;
+        font-weight: 600 !important;
+    }
+
 </style>
 
 
@@ -904,4 +958,127 @@ document.addEventListener('keydown', function(e) {
             }
         }
     });
+</script>
+
+
+
+
+
+<script>
+(function() {
+    // Get question ID from summary
+    function getQuestionId() {
+        const firstSummary = document.querySelector('summary strong');
+        return firstSummary ? firstSummary.textContent.trim() : '1';
+    }
+
+    // Communicate with parent window (if in iframe)
+    function notifyParent(choice) {
+        if (window.parent && window.parent !== window) {
+            window.parent.postMessage({
+                type: 'choiceSelected',
+                questionId: getQuestionId(),
+                choice: choice
+            }, '*');
+        }
+    }
+
+    // Load saved choice from parent or localStorage
+    function loadSavedChoice() {
+        const questionId = getQuestionId();
+
+        // Try to get from localStorage first
+        const saved = localStorage.getItem('choice_q' + questionId);
+        if (saved) {
+            selectChoice(saved, false);
+        }
+
+        // Ask parent for saved choice (if in iframe)
+        if (window.parent && window.parent !== window) {
+            window.parent.postMessage({
+                type: 'getChoice',
+                questionId: questionId
+            }, '*');
+        }
+    }
+
+    // Listen for messages from parent
+    window.addEventListener('message', function(event) {
+        if (event.data.type === 'setChoice' && event.data.questionId === getQuestionId()) {
+            selectChoice(event.data.choice, false);
+        }
+    });
+
+    // Select a choice
+    function selectChoice(choice, notify = true) {
+        if (!choice) return;
+
+        const questionId = getQuestionId();
+
+        // Remove previous selection
+        document.querySelectorAll('tr.answer-choice').forEach(row => {
+            row.classList.remove('selected');
+        });
+
+        // Add selection to clicked choice
+        const choiceRow = document.querySelector(`tr.answer-choice[data-choice="${choice}"]`);
+        if (choiceRow) {
+            choiceRow.classList.add('selected');
+
+            // Save to localStorage
+            localStorage.setItem('choice_q' + questionId, choice);
+
+            // Notify parent (if in iframe)
+            if (notify) {
+                notifyParent(choice);
+            }
+        }
+    }
+
+    // Initialize answer choices
+    function initializeChoices() {
+        // Find all answer choice rows (A, B, C, D, E, F, etc.)
+        const choicePattern = /^[A-Z]\.$/;
+        const tables = document.querySelectorAll('table.simple-table');
+
+        tables.forEach(table => {
+            const rows = table.querySelectorAll('tr');
+            rows.forEach(row => {
+                const firstCell = row.querySelector('td:first-child');
+                if (firstCell && choicePattern.test(firstCell.textContent.trim())) {
+                    const choice = firstCell.textContent.trim().replace('.', '');
+                    row.classList.add('answer-choice');
+                    row.setAttribute('data-choice', choice);
+                    row.style.position = 'relative';
+
+                    // Add click handler
+                    row.addEventListener('click', function(e) {
+                        // Don't trigger if clicking inside a link or button
+                        if (e.target.tagName === 'A' || e.target.closest('a')) return;
+
+                        // Toggle selection
+                        if (this.classList.contains('selected')) {
+                            this.classList.remove('selected');
+                            const questionId = getQuestionId();
+                            localStorage.removeItem('choice_q' + questionId);
+                            notifyParent('');
+                        } else {
+                            selectChoice(choice);
+                        }
+                    });
+                }
+            });
+        });
+
+        // Load saved choice after a short delay
+        setTimeout(loadSavedChoice, 100);
+    }
+
+    // Run when page loads
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initializeChoices);
+    } else {
+        initializeChoices();
+    }
+})();
 </script>

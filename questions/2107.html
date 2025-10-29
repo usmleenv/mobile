@@ -852,6 +852,15 @@ summary {
     
 
 
+    
+
+
+    
+
+
+    
+
+
     /* Clickable Answer Choices */
     table tr.answer-choice {
         cursor: pointer !important;
@@ -894,6 +903,85 @@ summary {
     table tr.answer-choice.selected td:first-child {
         color: #1a73e8 !important;
         font-weight: 600 !important;
+    }
+
+
+    
+
+
+    /* Answer Validation Styles */
+    tr.answer-choice.answer-correct {
+        background: linear-gradient(90deg, #d4edda 0%, #c3e6cb 100%) !important;
+        border: 3px solid #28a745 !important;
+        border-radius: 8px !important;
+        box-shadow: 0 2px 8px rgba(40, 167, 69, 0.3) !important;
+    }
+
+    tr.answer-choice.answer-correct td {
+        color: #155724 !important;
+        font-weight: 600 !important;
+    }
+
+    tr.answer-choice.answer-correct td:first-child::before {
+        border-color: #28a745 !important;
+        background: #28a745 !important;
+        box-shadow: 0 0 0 3px rgba(40, 167, 69, 0.2) !important;
+    }
+
+    tr.answer-choice.answer-incorrect {
+        background: linear-gradient(90deg, #f8d7da 0%, #f5c6cb 100%) !important;
+        border: 3px solid #dc3545 !important;
+        border-radius: 8px !important;
+        box-shadow: 0 2px 8px rgba(220, 53, 69, 0.3) !important;
+    }
+
+    tr.answer-choice.answer-incorrect td {
+        color: #721c24 !important;
+        font-weight: 600 !important;
+    }
+
+    tr.answer-choice.answer-incorrect td:first-child::before {
+        border-color: #dc3545 !important;
+        background: #dc3545 !important;
+        box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.2) !important;
+    }
+
+
+    /* Answer Validation Styles */
+    tr.answer-choice.answer-correct {
+        background: linear-gradient(90deg, #d4edda 0%, #c3e6cb 100%) !important;
+        border: 3px solid #28a745 !important;
+        border-radius: 8px !important;
+        box-shadow: 0 2px 8px rgba(40, 167, 69, 0.3) !important;
+    }
+
+    tr.answer-choice.answer-correct td {
+        color: #155724 !important;
+        font-weight: 600 !important;
+    }
+
+    tr.answer-choice.answer-correct td:first-child::before {
+        border-color: #28a745 !important;
+        background: #28a745 !important;
+        box-shadow: 0 0 0 3px rgba(40, 167, 69, 0.2) !important;
+    }
+
+    tr.answer-choice.answer-incorrect {
+        background: linear-gradient(90deg, #f8d7da 0%, #f5c6cb 100%) !important;
+        border: 3px solid #dc3545 !important;
+        border-radius: 8px !important;
+        box-shadow: 0 2px 8px rgba(220, 53, 69, 0.3) !important;
+    }
+
+    tr.answer-choice.answer-incorrect td {
+        color: #721c24 !important;
+        font-weight: 600 !important;
+    }
+
+    tr.answer-choice.answer-incorrect td:first-child::before {
+        border-color: #dc3545 !important;
+        background: #dc3545 !important;
+        box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.2) !important;
     }
 
 </style>
@@ -1125,6 +1213,154 @@ document.addEventListener('keydown', function(e) {
 
 
 
+
+
+<script>
+(function() {
+    // Get question ID from summary
+    function getQuestionId() {
+        const firstSummary = document.querySelector('summary strong');
+        return firstSummary ? firstSummary.textContent.trim() : '1';
+    }
+
+    // Find the correct answer by highest percentage
+    function findCorrectAnswer() {
+        // Find the Submit or Explanation details element
+        const submitDetails = Array.from(document.querySelectorAll('details')).find(d => {
+            const summary = d.querySelector('summary');
+            return summary && (summary.textContent.includes('Submit') || summary.textContent.includes('Explanation'));
+        });
+
+        if (!submitDetails) return null;
+
+        // Find all answer rows with percentages inside Submit section
+        const table = submitDetails.querySelector('table.simple-table');
+        if (!table) return null;
+
+        const rows = table.querySelectorAll('tr');
+        let maxPercentage = -1;
+        let correctChoice = null;
+
+        rows.forEach(row => {
+            const firstCell = row.querySelector('td:first-child');
+            const secondCell = row.querySelector('td:nth-child(2)');
+
+            if (firstCell && secondCell) {
+                const choiceMatch = firstCell.textContent.trim().match(/^([A-Z])\./);
+                const percentMatch = secondCell.textContent.match(/(\d+)%/);
+
+                if (choiceMatch && percentMatch) {
+                    const choice = choiceMatch[1];
+                    const percentage = parseInt(percentMatch[1]);
+
+                    if (percentage > maxPercentage) {
+                        maxPercentage = percentage;
+                        correctChoice = choice;
+                    }
+                }
+            }
+        });
+
+        return correctChoice;
+    }
+
+    // Check user's answer when Submit is opened
+    function checkAnswer() {
+        const questionId = getQuestionId();
+        const choiceKey = 'choice_q' + questionId;
+        const userChoice = localStorage.getItem(choiceKey);
+
+        if (!userChoice) {
+            console.log('No answer selected');
+            return;
+        }
+
+        const correctAnswer = findCorrectAnswer();
+        if (!correctAnswer) {
+            console.log('Could not determine correct answer');
+            return;
+        }
+
+        const isCorrect = userChoice === correctAnswer;
+
+        // Save result to localStorage
+        const resultKey = 'result_q' + questionId;
+        const resultValue = isCorrect ? 'correct' : 'incorrect';
+        localStorage.setItem(resultKey, resultValue);
+
+        // Force storage event for parent window
+        try {
+            window.dispatchEvent(new StorageEvent('storage', {
+                key: resultKey,
+                newValue: resultValue,
+                storageArea: localStorage
+            }));
+        } catch (e) {
+            console.log('Could not dispatch storage event:', e);
+        }
+
+        // Visual feedback - highlight the selected answer row
+        const selectedRow = document.querySelector(`tr.answer-choice[data-choice="${userChoice}"]`);
+        if (selectedRow) {
+            // Remove any existing validation classes
+            document.querySelectorAll('tr.answer-choice').forEach(row => {
+                row.classList.remove('answer-correct', 'answer-incorrect');
+            });
+
+            // Add appropriate class
+            if (isCorrect) {
+                selectedRow.classList.add('answer-correct');
+            } else {
+                selectedRow.classList.add('answer-incorrect');
+
+                // Also highlight the correct answer
+                const correctRow = document.querySelector(`tr.answer-choice[data-choice="${correctAnswer}"]`);
+                if (correctRow) {
+                    correctRow.classList.add('answer-correct');
+                }
+            }
+        }
+
+        // Notify parent window
+        if (window.parent && window.parent !== window) {
+            window.parent.postMessage({
+                type: 'answerValidated',
+                questionId: questionId,
+                userChoice: userChoice,
+                correctAnswer: correctAnswer,
+                isCorrect: isCorrect
+            }, '*');
+        }
+
+        console.log(`Answer checked: User=${userChoice}, Correct=${correctAnswer}, Result=${isCorrect ? 'Correct' : 'Incorrect'}`);
+    }
+
+    // Monitor Submit or Explanation details opening
+    function setupSubmitMonitor() {
+        const submitDetails = Array.from(document.querySelectorAll('details')).find(d => {
+            const summary = d.querySelector('summary');
+            return summary && (summary.textContent.includes('Submit') || summary.textContent.includes('Explanation'));
+        });
+
+        if (submitDetails) {
+            submitDetails.addEventListener('toggle', function() {
+                if (this.open) {
+                    // Small delay to ensure everything is rendered
+                    setTimeout(checkAnswer, 100);
+                }
+            });
+        }
+    }
+
+    // Initialize when page loads
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', setupSubmitMonitor);
+    } else {
+        setupSubmitMonitor();
+    }
+})();
+</script>
+
 <script>
 (function() {
     // Get question ID from summary
@@ -1240,6 +1476,460 @@ document.addEventListener('keydown', function(e) {
         document.addEventListener('DOMContentLoaded', initializeChoices);
     } else {
         initializeChoices();
+    }
+})();
+</script>
+
+<script>
+(function() {
+    // Get question ID from summary
+    function getQuestionId() {
+        const firstSummary = document.querySelector('summary strong');
+        return firstSummary ? firstSummary.textContent.trim() : '1';
+    }
+
+    // Find the correct answer by highest percentage
+    function findCorrectAnswer() {
+        // Find the Submit or Explanation details element
+        const submitDetails = Array.from(document.querySelectorAll('details')).find(d => {
+            const summary = d.querySelector('summary');
+            return summary && (summary.textContent.includes('Submit') || summary.textContent.includes('Explanation'));
+        });
+
+        if (!submitDetails) return null;
+
+        // Find all answer rows with percentages inside Submit section
+        const table = submitDetails.querySelector('table.simple-table');
+        if (!table) return null;
+
+        const rows = table.querySelectorAll('tr');
+        let maxPercentage = -1;
+        let correctChoice = null;
+
+        rows.forEach(row => {
+            const firstCell = row.querySelector('td:first-child');
+            const secondCell = row.querySelector('td:nth-child(2)');
+
+            if (firstCell && secondCell) {
+                const choiceMatch = firstCell.textContent.trim().match(/^([A-Z])\./);
+                const percentMatch = secondCell.textContent.match(/(\d+)%/);
+
+                if (choiceMatch && percentMatch) {
+                    const choice = choiceMatch[1];
+                    const percentage = parseInt(percentMatch[1]);
+
+                    if (percentage > maxPercentage) {
+                        maxPercentage = percentage;
+                        correctChoice = choice;
+                    }
+                }
+            }
+        });
+
+        return correctChoice;
+    }
+
+    // Check user's answer when Submit is opened
+    function checkAnswer() {
+        const questionId = getQuestionId();
+        const choiceKey = 'choice_q' + questionId;
+        const userChoice = localStorage.getItem(choiceKey);
+
+        if (!userChoice) {
+            console.log('No answer selected');
+            return;
+        }
+
+        const correctAnswer = findCorrectAnswer();
+        if (!correctAnswer) {
+            console.log('Could not determine correct answer');
+            return;
+        }
+
+        const isCorrect = userChoice === correctAnswer;
+
+        // Save result to localStorage
+        const resultKey = 'result_q' + questionId;
+        const resultValue = isCorrect ? 'correct' : 'incorrect';
+        localStorage.setItem(resultKey, resultValue);
+
+        // Force storage event for parent window
+        try {
+            window.dispatchEvent(new StorageEvent('storage', {
+                key: resultKey,
+                newValue: resultValue,
+                storageArea: localStorage
+            }));
+        } catch (e) {
+            console.log('Could not dispatch storage event:', e);
+        }
+
+        // Visual feedback - highlight the selected answer row
+        const selectedRow = document.querySelector(`tr.answer-choice[data-choice="${userChoice}"]`);
+        if (selectedRow) {
+            // Remove any existing validation classes
+            document.querySelectorAll('tr.answer-choice').forEach(row => {
+                row.classList.remove('answer-correct', 'answer-incorrect');
+            });
+
+            // Add appropriate class
+            if (isCorrect) {
+                selectedRow.classList.add('answer-correct');
+            } else {
+                selectedRow.classList.add('answer-incorrect');
+
+                // Also highlight the correct answer
+                const correctRow = document.querySelector(`tr.answer-choice[data-choice="${correctAnswer}"]`);
+                if (correctRow) {
+                    correctRow.classList.add('answer-correct');
+                }
+            }
+        }
+
+        // Notify parent window
+        if (window.parent && window.parent !== window) {
+            window.parent.postMessage({
+                type: 'answerValidated',
+                questionId: questionId,
+                userChoice: userChoice,
+                correctAnswer: correctAnswer,
+                isCorrect: isCorrect
+            }, '*');
+        }
+
+        console.log(`Answer checked: User=${userChoice}, Correct=${correctAnswer}, Result=${isCorrect ? 'Correct' : 'Incorrect'}`);
+    }
+
+    // Monitor Submit or Explanation details opening
+    function setupSubmitMonitor() {
+        const submitDetails = Array.from(document.querySelectorAll('details')).find(d => {
+            const summary = d.querySelector('summary');
+            return summary && (summary.textContent.includes('Submit') || summary.textContent.includes('Explanation'));
+        });
+
+        if (submitDetails) {
+            submitDetails.addEventListener('toggle', function() {
+                if (this.open) {
+                    // Small delay to ensure everything is rendered
+                    setTimeout(checkAnswer, 100);
+                }
+            });
+        }
+    }
+
+    // Initialize when page loads
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', setupSubmitMonitor);
+    } else {
+        setupSubmitMonitor();
+    }
+})();
+</script>
+
+<script>
+(function() {
+    // Get question ID from summary
+    function getQuestionId() {
+        const firstSummary = document.querySelector('summary strong');
+        return firstSummary ? firstSummary.textContent.trim() : '1';
+    }
+
+    // Find the correct answer by highest percentage
+    function findCorrectAnswer() {
+        // Find the Submit or Explanation details element
+        const submitDetails = Array.from(document.querySelectorAll('details')).find(d => {
+            const summary = d.querySelector('summary');
+            return summary && (summary.textContent.includes('Submit') || summary.textContent.includes('Explanation'));
+        });
+
+        if (!submitDetails) return null;
+
+        // Find all answer rows with percentages inside Submit section
+        const table = submitDetails.querySelector('table.simple-table');
+        if (!table) return null;
+
+        const rows = table.querySelectorAll('tr');
+        let maxPercentage = -1;
+        let correctChoice = null;
+
+        rows.forEach(row => {
+            const firstCell = row.querySelector('td:first-child');
+            const secondCell = row.querySelector('td:nth-child(2)');
+
+            if (firstCell && secondCell) {
+                const choiceMatch = firstCell.textContent.trim().match(/^([A-Z])\./);
+                const percentMatch = secondCell.textContent.match(/(\d+)%/);
+
+                if (choiceMatch && percentMatch) {
+                    const choice = choiceMatch[1];
+                    const percentage = parseInt(percentMatch[1]);
+
+                    if (percentage > maxPercentage) {
+                        maxPercentage = percentage;
+                        correctChoice = choice;
+                    }
+                }
+            }
+        });
+
+        return correctChoice;
+    }
+
+    // Check user's answer when Submit is opened
+    function checkAnswer() {
+        const questionId = getQuestionId();
+        const choiceKey = 'choice_q' + questionId;
+        const userChoice = localStorage.getItem(choiceKey);
+
+        if (!userChoice) {
+            console.log('No answer selected');
+            return;
+        }
+
+        const correctAnswer = findCorrectAnswer();
+        if (!correctAnswer) {
+            console.log('Could not determine correct answer');
+            return;
+        }
+
+        const isCorrect = userChoice === correctAnswer;
+
+        // Save result to localStorage
+        const resultKey = 'result_q' + questionId;
+        const resultValue = isCorrect ? 'correct' : 'incorrect';
+        localStorage.setItem(resultKey, resultValue);
+
+        // Force storage event for parent window
+        try {
+            window.dispatchEvent(new StorageEvent('storage', {
+                key: resultKey,
+                newValue: resultValue,
+                storageArea: localStorage
+            }));
+        } catch (e) {
+            console.log('Could not dispatch storage event:', e);
+        }
+
+        // Visual feedback - highlight the selected answer row
+        const selectedRow = document.querySelector(`tr.answer-choice[data-choice="${userChoice}"]`);
+        if (selectedRow) {
+            // Remove any existing validation classes
+            document.querySelectorAll('tr.answer-choice').forEach(row => {
+                row.classList.remove('answer-correct', 'answer-incorrect');
+            });
+
+            // Add appropriate class
+            if (isCorrect) {
+                selectedRow.classList.add('answer-correct');
+            } else {
+                selectedRow.classList.add('answer-incorrect');
+
+                // Also highlight the correct answer
+                const correctRow = document.querySelector(`tr.answer-choice[data-choice="${correctAnswer}"]`);
+                if (correctRow) {
+                    correctRow.classList.add('answer-correct');
+                }
+            }
+        }
+
+        // Notify parent window
+        if (window.parent && window.parent !== window) {
+            window.parent.postMessage({
+                type: 'answerValidated',
+                questionId: questionId,
+                userChoice: userChoice,
+                correctAnswer: correctAnswer,
+                isCorrect: isCorrect
+            }, '*');
+        }
+
+        console.log(`Answer checked: User=${userChoice}, Correct=${correctAnswer}, Result=${isCorrect ? 'Correct' : 'Incorrect'}`);
+    }
+
+    // Monitor Submit or Explanation details opening
+    function setupSubmitMonitor() {
+        const submitDetails = Array.from(document.querySelectorAll('details')).find(d => {
+            const summary = d.querySelector('summary');
+            return summary && (summary.textContent.includes('Submit') || summary.textContent.includes('Explanation'));
+        });
+
+        if (submitDetails) {
+            submitDetails.addEventListener('toggle', function() {
+                if (this.open) {
+                    // Small delay to ensure everything is rendered
+                    setTimeout(checkAnswer, 100);
+                }
+            });
+        }
+    }
+
+    // Initialize when page loads
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', setupSubmitMonitor);
+    } else {
+        setupSubmitMonitor();
+    }
+})();
+</script>
+
+<script>
+(function() {
+    // Get question ID from summary
+    function getQuestionId() {
+        const firstSummary = document.querySelector('summary strong');
+        return firstSummary ? firstSummary.textContent.trim() : '1';
+    }
+
+    // Find the correct answer by highest percentage
+    function findCorrectAnswer() {
+        // Find the Submit or Explanation details element
+        const submitDetails = Array.from(document.querySelectorAll('details')).find(d => {
+            const summary = d.querySelector('summary');
+            return summary && (summary.textContent.includes('Submit') || summary.textContent.includes('Explanation'));
+        });
+
+        if (!submitDetails) return null;
+
+        // Find all answer rows with percentages inside Submit section
+        const table = submitDetails.querySelector('table.simple-table');
+        if (!table) return null;
+
+        const rows = table.querySelectorAll('tr');
+        let maxPercentage = -1;
+        let correctChoice = null;
+
+        rows.forEach(row => {
+            const firstCell = row.querySelector('td:first-child');
+            const secondCell = row.querySelector('td:nth-child(2)');
+
+            if (firstCell && secondCell) {
+                const choiceMatch = firstCell.textContent.trim().match(/^([A-Z])\./);
+                const percentMatch = secondCell.textContent.match(/(\d+)%/);
+
+                if (choiceMatch && percentMatch) {
+                    const choice = choiceMatch[1];
+                    const percentage = parseInt(percentMatch[1]);
+
+                    if (percentage > maxPercentage) {
+                        maxPercentage = percentage;
+                        correctChoice = choice;
+                    }
+                }
+            }
+        });
+
+        return correctChoice;
+    }
+
+    // Check user's answer when Submit is opened
+    function checkAnswer() {
+        const questionId = getQuestionId();
+        const choiceKey = 'choice_q' + questionId;
+        const userChoice = localStorage.getItem(choiceKey);
+
+        if (!userChoice) {
+            console.log('No answer selected');
+            return;
+        }
+
+        const correctAnswer = findCorrectAnswer();
+        if (!correctAnswer) {
+            console.log('Could not determine correct answer');
+            return;
+        }
+
+        const isCorrect = userChoice === correctAnswer;
+
+        // Save result to localStorage
+        const resultKey = 'result_q' + questionId;
+        const resultValue = isCorrect ? 'correct' : 'incorrect';
+        localStorage.setItem(resultKey, resultValue);
+
+        // Force storage event for parent window
+        try {
+            window.dispatchEvent(new StorageEvent('storage', {
+                key: resultKey,
+                newValue: resultValue,
+                storageArea: localStorage
+            }));
+        } catch (e) {
+            console.log('Could not dispatch storage event:', e);
+        }
+
+        // Visual feedback - highlight the selected answer row
+        const selectedRow = document.querySelector(`tr.answer-choice[data-choice="${userChoice}"]`);
+        if (selectedRow) {
+            // Remove any existing validation classes
+            document.querySelectorAll('tr.answer-choice').forEach(row => {
+                row.classList.remove('answer-correct', 'answer-incorrect');
+            });
+
+            // Add appropriate class
+            if (isCorrect) {
+                selectedRow.classList.add('answer-correct');
+            } else {
+                selectedRow.classList.add('answer-incorrect');
+
+                // Also highlight the correct answer
+                const correctRow = document.querySelector(`tr.answer-choice[data-choice="${correctAnswer}"]`);
+                if (correctRow) {
+                    correctRow.classList.add('answer-correct');
+                }
+            }
+        }
+
+        // Notify parent window
+        if (window.parent && window.parent !== window) {
+            window.parent.postMessage({
+                type: 'answerValidated',
+                questionId: questionId,
+                userChoice: userChoice,
+                correctAnswer: correctAnswer,
+                isCorrect: isCorrect
+            }, '*');
+        }
+
+        console.log(`Answer checked: User=${userChoice}, Correct=${correctAnswer}, Result=${isCorrect ? 'Correct' : 'Incorrect'}`);
+    }
+
+    // Monitor Submit or Explanation details opening
+    function setupSubmitMonitor() {
+        const submitDetails = Array.from(document.querySelectorAll('details')).find(d => {
+            const summary = d.querySelector('summary');
+            return summary && (summary.textContent.includes('Submit') || summary.textContent.includes('Explanation'));
+        });
+
+        if (submitDetails) {
+            submitDetails.addEventListener('toggle', function() {
+                if (this.open) {
+                    // Small delay to ensure everything is rendered
+                    setTimeout(checkAnswer, 100);
+
+                    // Notify parent that Submit/Explanation was opened
+                    if (window.parent && window.parent !== window) {
+                        window.parent.postMessage({
+                            type: 'submitOpened',
+                            questionId: getQuestionId()
+                        }, '*');
+                    }
+                } else {
+                    // Notify parent that Submit/Explanation was closed
+                    if (window.parent && window.parent !== window) {
+                        window.parent.postMessage({
+                            type: 'submitClosed',
+                            questionId: getQuestionId()
+                        }, '*');
+                    }
+                }
+            });
+        }
+    }
+
+    // Initialize when page loads
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', setupSubmitMonitor);
+    } else {
+        setupSubmitMonitor();
     }
 })();
 </script>

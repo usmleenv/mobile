@@ -2096,6 +2096,8 @@
             const answerSelect = document.getElementById('answer-select');
             if (answerSelect) {
                 answerSelect.value = questionData[questionId]?.selectedAnswer || '';
+                // Reset the last checked choice for the polling function
+                lastCheckedChoice = questionData[questionId]?.selectedAnswer || '';
             }
 
             // Update navigation buttons
@@ -2241,7 +2243,55 @@
 
             questionData[questionId].selectedAnswer = answerSelect.value;
             saveQuestionData();
+
+            // Also save to the choice_q format that iframe uses
+            const choiceKey = 'choice_q' + questionId;
+            if (answerSelect.value) {
+                localStorage.setItem(choiceKey, answerSelect.value);
+            } else {
+                localStorage.removeItem(choiceKey);
+            }
+
+            // Update lastCheckedChoice to prevent loop
+            lastCheckedChoice = answerSelect.value;
         }
+
+        // Check for choice changes in iframe (using localStorage polling)
+        let lastCheckedChoice = '';
+
+        function checkIframeChoice() {
+            if (!currentQuestions || currentQuestions.length === 0) return;
+
+            const questionId = currentQuestions[currentQuestionIndex];
+            const choiceKey = 'choice_q' + questionId;
+            const currentChoice = localStorage.getItem(choiceKey) || '';
+
+            if (currentChoice && currentChoice !== lastCheckedChoice) {
+                lastCheckedChoice = currentChoice;
+
+                const answerSelect = document.getElementById('answer-select');
+                if (answerSelect && answerSelect.value !== currentChoice) {
+                    answerSelect.value = currentChoice;
+
+                    // Save to questionData
+                    if (!questionData[questionId]) {
+                        questionData[questionId] = {
+                            isFlagged: false,
+                            isCorrect: false,
+                            isIncorrect: false,
+                            attempts: 0,
+                            lastAttempted: new Date().toISOString(),
+                            selectedAnswer: ''
+                        };
+                    }
+                    questionData[questionId].selectedAnswer = currentChoice;
+                    saveQuestionData();
+                }
+            }
+        }
+
+        // Check every 500ms for changes
+        setInterval(checkIframeChoice, 500);
 
         // Get all valid question IDs from topics
         function getAllValidQuestionIds() {

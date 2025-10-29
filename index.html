@@ -388,6 +388,7 @@
         .question-actions {
             display: flex;
             gap: 8px;
+            align-items: center;
         }
 
         .action-btn {
@@ -422,6 +423,39 @@
             background: #ea4335;
             border-color: #ea4335;
             color: white;
+        }
+
+        .answer-selector {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .answer-selector label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #666;
+            white-space: nowrap;
+        }
+
+        .answer-dropdown {
+            padding: 6px 8px;
+            border: 1px solid #ddd;
+            border-radius: 18px;
+            background: white;
+            color: #202124;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            width: 50px;
+            height: 36px;
+            text-align: center;
+        }
+
+        .answer-dropdown:focus {
+            outline: none;
+            border-color: #1a73e8;
         }
 
         .question-iframe {
@@ -864,6 +898,38 @@
                 <div class="question-header">
                     <span class="question-number" id="questionNumber">Question #</span>
                     <div class="question-actions">
+                        <div class="answer-selector">
+                            <label for="answer-select">Ans:</label>
+                            <select id="answer-select" class="answer-dropdown" onchange="saveSelectedAnswer()">
+                                <option value="">-</option>
+                                <option value="A">A</option>
+                                <option value="B">B</option>
+                                <option value="C">C</option>
+                                <option value="D">D</option>
+                                <option value="E">E</option>
+                                <option value="F">F</option>
+                                <option value="G">G</option>
+                                <option value="H">H</option>
+                                <option value="I">I</option>
+                                <option value="J">J</option>
+                                <option value="K">K</option>
+                                <option value="L">L</option>
+                                <option value="M">M</option>
+                                <option value="N">N</option>
+                                <option value="O">O</option>
+                                <option value="P">P</option>
+                                <option value="Q">Q</option>
+                                <option value="R">R</option>
+                                <option value="S">S</option>
+                                <option value="T">T</option>
+                                <option value="U">U</option>
+                                <option value="V">V</option>
+                                <option value="W">W</option>
+                                <option value="X">X</option>
+                                <option value="Y">Y</option>
+                                <option value="Z">Z</option>
+                            </select>
+                        </div>
                         <button class="action-btn" id="correctBtn" onclick="markQuestion('correct')" title="Mark Correct">✓</button>
                         <button class="action-btn" id="incorrectBtn" onclick="markQuestion('incorrect')" title="Mark Incorrect">✗</button>
                         <button class="action-btn" id="flagBtn" onclick="toggleFlag()" title="Flag">🚩</button>
@@ -2026,6 +2092,12 @@
                 incorrectBtn.classList.remove('incorrect');
             }
 
+            // Update answer dropdown
+            const answerSelect = document.getElementById('answer-select');
+            if (answerSelect) {
+                answerSelect.value = questionData[questionId]?.selectedAnswer || '';
+            }
+
             // Update navigation buttons
             document.getElementById('prevBtn').disabled = index === 0;
             document.getElementById('nextBtn').disabled = index === currentQuestions.length - 1;
@@ -2037,7 +2109,8 @@
                     isCorrect: false,
                     isIncorrect: false,
                     attempts: 0,
-                    lastAttempted: new Date().toISOString()
+                    lastAttempted: new Date().toISOString(),
+                    selectedAnswer: ''
                 };
             }
             questionData[questionId].attempts++;
@@ -2075,7 +2148,8 @@
                     isCorrect: false,
                     isIncorrect: false,
                     attempts: 0,
-                    lastAttempted: new Date().toISOString()
+                    lastAttempted: new Date().toISOString(),
+                    selectedAnswer: ''
                 };
             }
 
@@ -2108,7 +2182,8 @@
                     isCorrect: false,
                     isIncorrect: false,
                     attempts: 0,
-                    lastAttempted: new Date().toISOString()
+                    lastAttempted: new Date().toISOString(),
+                    selectedAnswer: ''
                 };
             }
 
@@ -2144,6 +2219,28 @@
             if (sidebar && sidebar.classList.contains('open')) {
                 renderQuestionsList();
             }
+        }
+
+        // Save selected answer from dropdown
+        function saveSelectedAnswer() {
+            if (!currentQuestions || currentQuestions.length === 0) return;
+
+            const questionId = currentQuestions[currentQuestionIndex];
+            const answerSelect = document.getElementById('answer-select');
+
+            if (!questionData[questionId]) {
+                questionData[questionId] = {
+                    isFlagged: false,
+                    isCorrect: false,
+                    isIncorrect: false,
+                    attempts: 0,
+                    lastAttempted: new Date().toISOString(),
+                    selectedAnswer: ''
+                };
+            }
+
+            questionData[questionId].selectedAnswer = answerSelect.value;
+            saveQuestionData();
         }
 
         // Get all valid question IDs from topics
@@ -2261,29 +2358,51 @@
                 try {
                     const backup = JSON.parse(e.target.result);
 
+                    // Check if it's new format (has backupDate) or old format
+                    let dataToMerge = null;
+                    let isOldFormat = false;
+
+                    if (backup.backupDate && backup.questionData) {
+                        // New format backup
+                        dataToMerge = backup.questionData;
+                    } else if (backup.questionData && !backup.backupDate) {
+                        // Old USMLE Environment format - needs migration
+                        const migrated = migrateOldBackup(backup.questionData);
+                        dataToMerge = migrated.data;
+                        isOldFormat = true;
+                    } else {
+                        throw new Error('Invalid backup format');
+                    }
+
                     // Merge with existing data
-                    if (backup.questionData) {
-                        Object.keys(backup.questionData).forEach(qid => {
+                    if (dataToMerge) {
+                        Object.keys(dataToMerge).forEach(qid => {
                             if (!questionData[qid]) {
-                                questionData[qid] = backup.questionData[qid];
+                                questionData[qid] = dataToMerge[qid];
                             } else {
                                 // Merge data (keep most attempts, most recent date, etc.)
                                 const existing = questionData[qid];
-                                const incoming = backup.questionData[qid];
+                                const incoming = dataToMerge[qid];
 
                                 questionData[qid] = {
                                     isFlagged: existing.isFlagged || incoming.isFlagged,
                                     isCorrect: existing.isCorrect || incoming.isCorrect,
                                     isIncorrect: existing.isIncorrect || incoming.isIncorrect,
                                     attempts: Math.max(existing.attempts || 0, incoming.attempts || 0),
-                                    lastAttempted: new Date(existing.lastAttempted) > new Date(incoming.lastAttempted) ? existing.lastAttempted : incoming.lastAttempted
+                                    lastAttempted: new Date(existing.lastAttempted) > new Date(incoming.lastAttempted) ? existing.lastAttempted : incoming.lastAttempted,
+                                    selectedAnswer: incoming.selectedAnswer || existing.selectedAnswer || ''
                                 };
                             }
                         });
 
                         saveQuestionData();
                         updateStats();
-                        showToast('Backup uploaded and merged successfully!');
+
+                        if (isOldFormat) {
+                            showToast('✅ Old USMLE Environment backup migrated successfully!');
+                        } else {
+                            showToast('Backup uploaded and merged successfully!');
+                        }
                     } else {
                         throw new Error('Invalid backup format');
                     }
@@ -2295,6 +2414,50 @@
 
             // Reset file input
             event.target.value = '';
+        }
+
+        // Migrate old backup format to new format
+        function migrateOldBackup(oldData) {
+            const newData = {};
+            const stats = {
+                total: 0,
+                correct: 0,
+                incorrect: 0,
+                flagged: 0
+            };
+
+            for (const [qId, oldQuestion] of Object.entries(oldData)) {
+                // Convert old format to new format
+                // Old format: {mark, correct, incorrect, choice, date}
+                const isFlagged = oldQuestion.mark === true;
+                const isCorrect = oldQuestion.correct === true;
+                const isIncorrect = oldQuestion.incorrect === true;
+                const selectedAnswer = oldQuestion.choice || '';
+
+                // Only add question if it has any data
+                if (oldQuestion.date || isCorrect || isIncorrect || isFlagged || selectedAnswer) {
+                    newData[qId] = {
+                        isFlagged: isFlagged,
+                        isCorrect: isCorrect,
+                        isIncorrect: isIncorrect,
+                        attempts: (isCorrect || isIncorrect) ? 1 : 0,
+                        lastAttempted: oldQuestion.date || new Date().toISOString().split('T')[0],
+                        selectedAnswer: selectedAnswer
+                    };
+
+                    // Count statistics
+                    if (isCorrect) stats.correct++;
+                    if (isIncorrect) stats.incorrect++;
+                    if (isFlagged) stats.flagged++;
+                }
+            }
+
+            stats.total = stats.correct + stats.incorrect;
+
+            return {
+                data: newData,
+                stats: stats
+            };
         }
 
         // Clear all data

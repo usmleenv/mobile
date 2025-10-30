@@ -826,8 +826,236 @@
             display: none;
         }
     </style>
+
+    <!-- Geo-blocking styles -->
+    <style>
+        #geo-blocker {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 999999;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        #geo-blocker.allowed {
+            display: none;
+        }
+
+        .geo-blocker-content {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 500px;
+            margin: 20px;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        .geo-blocker-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+
+        .geo-blocker-title {
+            font-size: 24px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 12px;
+        }
+
+        .geo-blocker-message {
+            font-size: 16px;
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+
+        .geo-blocker-location {
+            background: #f0f0f0;
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 14px;
+            color: #333;
+            margin-top: 20px;
+        }
+
+        .geo-loading {
+            text-align: center;
+        }
+
+        .geo-spinner {
+            border: 4px solid #f0f0f0;
+            border-top: 4px solid #1a73e8;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .geo-loading-text {
+            color: #666;
+            font-size: 16px;
+        }
+    </style>
 </head>
 <body>
+    <!-- Geo-blocking overlay -->
+    <div id="geo-blocker"></div>
+
+    <script>
+        // Geo-blocking script - Enhanced version with multiple API fallbacks
+        (function() {
+            const ALLOWED_COUNTRIES = [
+                'BR', // Brasil
+                'AR', // Argentina
+                'CL', // Chile
+                'CO', // Colômbia
+                'PE', // Peru
+                'MX', // México
+                'UY', // Uruguai
+                'PY', // Paraguai
+                'BO', // Bolívia
+                'EC', // Equador
+                'VE', // Venezuela
+                'CR', // Costa Rica
+                'PA', // Panamá
+                'GT', // Guatemala
+                'HN', // Honduras
+                'SV', // El Salvador
+                'NI', // Nicarágua
+                'CU', // Cuba
+                'DO', // República Dominicana
+                'HT', // Haiti
+                'JM', // Jamaica
+                'TT', // Trinidad e Tobago
+                'BB', // Barbados
+                'BS', // Bahamas
+                'BZ', // Belize
+                'GY', // Guiana
+                'SR', // Suriname
+                'GF'  // Guiana Francesa
+            ];
+
+            const geoBlocker = document.getElementById('geo-blocker');
+            let accessGranted = false;
+
+            function showBlockedMessage(city, countryName, countryCode) {
+                // Show fake 404 error to confuse users outside Latin America
+                geoBlocker.style.background = '#ffffff';
+                geoBlocker.innerHTML = `
+                    <div class="geo-blocker-content" style="max-width: 600px;">
+                        <div style="font-size: 120px; font-weight: bold; color: #e0e0e0; margin-bottom: 20px;">404</div>
+                        <div class="geo-blocker-title" style="font-size: 32px; margin-bottom: 16px;">Page Not Found</div>
+                        <div class="geo-blocker-message" style="color: #666; font-size: 16px;">
+                            The page you are looking for might have been removed, had its name changed, or is temporarily unavailable.
+                            <br><br>
+                            Please check the URL or return to the homepage.
+                        </div>
+                        <div style="margin-top: 30px; padding: 16px; background: #f5f5f5; border-radius: 8px; font-size: 13px; color: #999;">
+                            Error Code: 404 | Server: GitHub Pages | Time: ${new Date().toUTCString()}
+                        </div>
+                    </div>
+                `;
+            }
+
+            function showErrorMessage() {
+                // Also show 404 for verification errors
+                geoBlocker.style.background = '#ffffff';
+                geoBlocker.innerHTML = `
+                    <div class="geo-blocker-content" style="max-width: 600px;">
+                        <div style="font-size: 120px; font-weight: bold; color: #e0e0e0; margin-bottom: 20px;">404</div>
+                        <div class="geo-blocker-title" style="font-size: 32px; margin-bottom: 16px;">Page Not Found</div>
+                        <div class="geo-blocker-message" style="color: #666; font-size: 16px;">
+                            The page you are looking for might have been removed, had its name changed, or is temporarily unavailable.
+                            <br><br>
+                            Please check the URL or return to the homepage.
+                        </div>
+                        <div style="margin-top: 30px; padding: 16px; background: #f5f5f5; border-radius: 8px; font-size: 13px; color: #999;">
+                            Error Code: 404 | Server: GitHub Pages | Time: ${new Date().toUTCString()}
+                        </div>
+                    </div>
+                `;
+            }
+
+            function checkCountry(countryCode, countryName, city) {
+                if (!countryCode) {
+                    console.error('No country code received');
+                    showErrorMessage();
+                    return;
+                }
+
+                console.log('Detected location:', { city, countryName, countryCode });
+
+                if (ALLOWED_COUNTRIES.includes(countryCode)) {
+                    accessGranted = true;
+                    geoBlocker.classList.add('allowed');
+                } else {
+                    showBlockedMessage(city, countryName, countryCode);
+                }
+            }
+
+            // Try primary API: ipapi.co
+            fetch('https://ipapi.co/json/')
+                .then(response => {
+                    if (!response.ok) throw new Error('ipapi.co failed');
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.error) throw new Error(data.reason || 'API error');
+                    checkCountry(data.country_code, data.country_name, data.city);
+                })
+                .catch(error => {
+                    console.warn('Primary API failed, trying backup:', error);
+
+                    // Try backup API: ip-api.com
+                    fetch('http://ip-api.com/json/')
+                        .then(response => {
+                            if (!response.ok) throw new Error('ip-api.com failed');
+                            return response.json();
+                        })
+                        .then(data => {
+                            if (data.status === 'fail') throw new Error(data.message || 'API error');
+                            checkCountry(data.countryCode, data.country, data.city);
+                        })
+                        .catch(error2 => {
+                            console.error('All APIs failed:', error2);
+                            // BLOCK by default if all APIs fail
+                            showErrorMessage();
+                        });
+                });
+
+            // Prevent manipulation: Monitor DOM changes
+            const observer = new MutationObserver(function(mutations) {
+                if (!accessGranted && !document.getElementById('geo-blocker')) {
+                    location.reload();
+                }
+            });
+
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
+
+            // Prevent console manipulation
+            Object.defineProperty(window, 'accessGranted', {
+                get: function() { return false; },
+                set: function() { return false; }
+            });
+        })();
+    </script>
+
     <!-- Login Screen -->
     <div class="login-screen" id="login-screen">
         <div class="login-box">

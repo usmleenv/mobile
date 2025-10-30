@@ -1878,9 +1878,46 @@
                 loadQuestionData();
                 renderTopics();
                 updateStats();
+
+                // Restore last session if available
+                restoreLastSession();
             } catch (error) {
                 console.error('Error in init():', error);
                 alert('Error initializing app: ' + error.message);
+            }
+        }
+
+        // Restore last session after page reload
+        function restoreLastSession() {
+            const lastSession = localStorage.getItem('lastSession');
+            if (!lastSession) return;
+
+            try {
+                const session = JSON.parse(lastSession);
+                if (!session.system || !session.category) return;
+
+                // Check if the topic still exists
+                if (!topics[session.system] || !topics[session.system][session.category]) {
+                    localStorage.removeItem('lastSession');
+                    return;
+                }
+
+                // Restore the session
+                console.log('Restoring last session:', session);
+                const questions = topics[session.system][session.category];
+
+                // Validate question index
+                const questionIndex = Math.min(session.questionIndex || 0, questions.length - 1);
+
+                currentSubtopic = { system: session.system, category: session.category };
+                currentQuestions = questions;
+                currentQuestionIndex = questionIndex;
+
+                loadQuestion(questionIndex);
+                switchView('question');
+            } catch (error) {
+                console.error('Error restoring session:', error);
+                localStorage.removeItem('lastSession');
             }
         }
 
@@ -2122,6 +2159,15 @@
             questionData[questionId].attempts++;
             questionData[questionId].lastAttempted = new Date().toISOString();
             saveQuestionData();
+
+            // Save current position for page reload recovery
+            if (currentSubtopic && currentSubtopic.system && currentSubtopic.category) {
+                localStorage.setItem('lastSession', JSON.stringify({
+                    system: currentSubtopic.system,
+                    category: currentSubtopic.category,
+                    questionIndex: currentQuestionIndex
+                }));
+            }
 
             // Update sidebar if it's open
             const sidebar = document.getElementById('questionsSidebar');
@@ -2682,11 +2728,25 @@
             sidebar.classList.add('open');
             overlay.classList.add('open');
             renderQuestionsList();
+
+            // Restore scroll position after a brief delay to allow rendering
+            setTimeout(() => {
+                const savedScroll = localStorage.getItem('sidebarScrollPosition');
+                if (savedScroll) {
+                    sidebar.scrollTop = parseInt(savedScroll);
+                }
+            }, 50);
         }
 
         function closeSidebar() {
             const sidebar = document.getElementById('questionsSidebar');
             const overlay = document.getElementById('sidebarOverlay');
+
+            // Save scroll position before closing
+            if (sidebar.scrollTop > 0) {
+                localStorage.setItem('sidebarScrollPosition', sidebar.scrollTop.toString());
+            }
+
             sidebar.classList.remove('open');
             overlay.classList.remove('open');
         }
@@ -2783,11 +2843,27 @@
             // If not authenticated, content will be loaded after password is entered
         }
 
+        // Add sidebar scroll listener for persistence
+        function setupSidebarScrollListener() {
+            const sidebar = document.getElementById('questionsSidebar');
+            if (sidebar) {
+                sidebar.addEventListener('scroll', () => {
+                    if (sidebar.classList.contains('open')) {
+                        localStorage.setItem('sidebarScrollPosition', sidebar.scrollTop.toString());
+                    }
+                });
+            }
+        }
+
         // Start initialization
         if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', startApp);
+            document.addEventListener('DOMContentLoaded', () => {
+                startApp();
+                setupSidebarScrollListener();
+            });
         } else {
             startApp();
+            setupSidebarScrollListener();
         }
     </script>
 </body>

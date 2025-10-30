@@ -930,28 +930,49 @@ document.addEventListener('keydown', function(e) {
         if (!selection.toString().trim()) return;
 
         const range = selection.getRangeAt(0);
-        const container = range.commonAncestorContainer;
 
-        // Only highlight text in paragraphs, not in buttons or other elements
-        const paragraph = container.nodeType === 3 ? container.parentElement : container;
-        if (paragraph.tagName !== 'P' && paragraph.tagName !== 'LI' && paragraph.tagName !== 'TD') {
+        // Check if selection is in valid elements
+        const container = range.commonAncestorContainer;
+        const parent = container.nodeType === 3 ? container.parentElement : container;
+
+        // Only allow highlighting in paragraphs, list items, and table cells
+        if (!parent.closest('p') && !parent.closest('li') && !parent.closest('td')) {
             return;
         }
 
-        // Create highlight span
-        const span = document.createElement('span');
-        span.classList.add('highlighted');
+        // Don't highlight if inside summary, button, or other UI elements
+        if (parent.closest('summary') || parent.closest('button') || parent.closest('.bionic-reading-btn') || parent.closest('.highlighter-btn')) {
+            return;
+        }
 
         // Generate unique ID for this highlight
         const highlightId = 'hl-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
-        span.setAttribute('data-highlight-id', highlightId);
 
         try {
-            range.surroundContents(span);
-            questionHighlights[highlightId] = true;
-            saveHighlights();
+            // Create a span for highlighting
+            const span = document.createElement('span');
+            span.classList.add('highlighted');
+            span.setAttribute('data-highlight-id', highlightId);
+
+            // Try simple surroundContents first
+            try {
+                range.surroundContents(span);
+                questionHighlights[highlightId] = true;
+                saveHighlights();
+            } catch (e) {
+                // If that fails (crossing element boundaries), use extractContents approach
+                const fragment = range.extractContents();
+                span.appendChild(fragment);
+                range.insertNode(span);
+
+                // Merge adjacent text nodes to clean up
+                span.normalize();
+
+                questionHighlights[highlightId] = true;
+                saveHighlights();
+            }
         } catch (e) {
-            console.log('Could not highlight selection');
+            console.log('Could not highlight selection:', e);
         }
 
         selection.removeAllRanges();

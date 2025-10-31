@@ -1876,6 +1876,7 @@
                 console.log('Init called');
                 console.log('Topics available:', typeof window.topics, window.topics ? Object.keys(window.topics).length : 0);
                 loadQuestionData();
+                migrateQuestionData(); // Ensure all data has required fields
                 renderTopics();
                 updateStats();
 
@@ -1930,6 +1931,57 @@
                 } catch (e) {
                     questionData = {};
                 }
+            }
+        }
+
+        // Data Migration - Ensure all questions have required fields
+        function migrateQuestionData() {
+            try {
+                let migrated = false;
+
+                // Ensure all questions have lastAttempted and testId
+                for (const qId in questionData) {
+                    const data = questionData[qId];
+
+                    // Ensure lastAttempted is in YYYY-MM-DD format
+                    if (data.lastAttempted) {
+                        // Convert ISO string to YYYY-MM-DD if needed
+                        if (data.lastAttempted.includes('T')) {
+                            data.lastAttempted = data.lastAttempted.split('T')[0];
+                            migrated = true;
+                        }
+                    } else if (data.isCorrect || data.isIncorrect || data.attempts > 0) {
+                        // Question was attempted but no date - use a generic old date
+                        data.lastAttempted = '2024-01-01';
+                        migrated = true;
+                    } else {
+                        // Not yet attempted - set empty string
+                        data.lastAttempted = '';
+                    }
+
+                    // Ensure testId exists for attempted questions
+                    if (!data.testId && data.lastAttempted && (data.isCorrect || data.isIncorrect || data.attempts > 0)) {
+                        // Create a generic testId based on date
+                        data.testId = 'legacy_' + data.lastAttempted;
+                        migrated = true;
+                    } else if (!data.testId) {
+                        data.testId = '';
+                    }
+
+                    // Ensure selectedAnswer exists
+                    if (data.selectedAnswer === undefined) {
+                        data.selectedAnswer = '';
+                        migrated = true;
+                    }
+                }
+
+                // Save if any migrations occurred
+                if (migrated) {
+                    saveQuestionData();
+                    console.log('Question data migration completed (mobile)');
+                }
+            } catch (error) {
+                console.error('Error during data migration:', error);
             }
         }
 
@@ -2147,17 +2199,23 @@
 
             // Track as attempted
             if (!questionData[questionId]) {
+                const currentDate = new Date().toISOString().split('T')[0];
                 questionData[questionId] = {
                     isFlagged: false,
                     isCorrect: false,
                     isIncorrect: false,
                     attempts: 0,
-                    lastAttempted: new Date().toISOString(),
-                    selectedAnswer: ''
+                    lastAttempted: currentDate,
+                    selectedAnswer: '',
+                    testId: 'session_' + currentDate
                 };
             }
             questionData[questionId].attempts++;
-            questionData[questionId].lastAttempted = new Date().toISOString();
+            const currentDate = new Date().toISOString().split('T')[0];
+            questionData[questionId].lastAttempted = currentDate;
+            if (!questionData[questionId].testId) {
+                questionData[questionId].testId = 'session_' + currentDate;
+            }
             saveQuestionData();
 
             // Save current position for page reload recovery
@@ -2194,18 +2252,28 @@
             if (!currentQuestions || currentQuestions.length === 0) return;
 
             const questionId = currentQuestions[currentQuestionIndex];
+            const currentDate = new Date().toISOString().split('T')[0];
             if (!questionData[questionId]) {
                 questionData[questionId] = {
                     isFlagged: false,
                     isCorrect: false,
                     isIncorrect: false,
                     attempts: 0,
-                    lastAttempted: new Date().toISOString(),
-                    selectedAnswer: ''
+                    lastAttempted: currentDate,
+                    selectedAnswer: '',
+                    testId: 'session_' + currentDate
                 };
             }
 
             questionData[questionId].isFlagged = !questionData[questionId].isFlagged;
+
+            // Ensure lastAttempted and testId are set
+            if (!questionData[questionId].lastAttempted) {
+                questionData[questionId].lastAttempted = currentDate;
+            }
+            if (!questionData[questionId].testId) {
+                questionData[questionId].testId = 'session_' + currentDate;
+            }
 
             const flagBtn = document.getElementById('flagBtn');
             if (questionData[questionId].isFlagged) {
@@ -2228,15 +2296,25 @@
             if (!currentQuestions || currentQuestions.length === 0) return;
 
             const questionId = currentQuestions[currentQuestionIndex];
+            const currentDate = new Date().toISOString().split('T')[0];
             if (!questionData[questionId]) {
                 questionData[questionId] = {
                     isFlagged: false,
                     isCorrect: false,
                     isIncorrect: false,
                     attempts: 0,
-                    lastAttempted: new Date().toISOString(),
-                    selectedAnswer: ''
+                    lastAttempted: currentDate,
+                    selectedAnswer: '',
+                    testId: 'session_' + currentDate
                 };
+            }
+
+            // Ensure lastAttempted and testId are set
+            if (!questionData[questionId].lastAttempted) {
+                questionData[questionId].lastAttempted = currentDate;
+            }
+            if (!questionData[questionId].testId) {
+                questionData[questionId].testId = 'session_' + currentDate;
             }
 
             const correctBtn = document.getElementById('correctBtn');

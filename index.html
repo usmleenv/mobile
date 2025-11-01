@@ -1870,6 +1870,13 @@
         let currentSubtopic = null;
         let questionData = {};
 
+        // Hidden timer for tracking time per question
+        let questionTimerMs = 0;
+        let questionTimerInterval = null;
+        let questionTimerRunning = false;
+        let questionTimerLastTick = 0;
+        let previousQuestionId = null;
+
         // Initialize
         function init() {
             try {
@@ -1920,6 +1927,60 @@
                 console.error('Error restoring session:', error);
                 localStorage.removeItem('lastSession');
             }
+        }
+
+        // Hidden timer functions for tracking time per question
+        function startQuestionTimer() {
+            if (questionTimerInterval) {
+                clearInterval(questionTimerInterval);
+            }
+
+            questionTimerMs = 0;
+            questionTimerRunning = true;
+            questionTimerLastTick = Date.now();
+
+            questionTimerInterval = setInterval(() => {
+                if (questionTimerRunning) {
+                    const now = Date.now();
+                    const diff = now - questionTimerLastTick;
+                    questionTimerLastTick = now;
+                    questionTimerMs += diff;
+                }
+            }, 1000);
+        }
+
+        function pauseQuestionTimer() {
+            if (questionTimerRunning) {
+                const now = Date.now();
+                const diff = now - questionTimerLastTick;
+                questionTimerMs += diff;
+                questionTimerRunning = false;
+            }
+        }
+
+        function resumeQuestionTimer() {
+            if (!questionTimerRunning) {
+                questionTimerRunning = true;
+                questionTimerLastTick = Date.now();
+            }
+        }
+
+        function stopQuestionTimer() {
+            if (questionTimerInterval) {
+                clearInterval(questionTimerInterval);
+                questionTimerInterval = null;
+            }
+            questionTimerRunning = false;
+            questionTimerMs = 0;
+        }
+
+        function getQuestionTimerMs() {
+            if (questionTimerRunning) {
+                const now = Date.now();
+                const diff = now - questionTimerLastTick;
+                return questionTimerMs + diff;
+            }
+            return questionTimerMs;
         }
 
         // Load question data from localStorage
@@ -2153,8 +2214,19 @@
         function loadQuestion(index) {
             if (!currentQuestions || currentQuestions.length === 0) return;
 
+            // Save time for previous question before loading new one
+            if (previousQuestionId && questionData[previousQuestionId]) {
+                const timeSpent = getQuestionTimerMs();
+                if (timeSpent > 0) {
+                    questionData[previousQuestionId].testTime = timeSpent.toString();
+                    questionData[previousQuestionId].testId = previousQuestionId.toString();
+                    saveQuestionData();
+                }
+            }
+
             currentQuestionIndex = index;
             const questionId = currentQuestions[index];
+            previousQuestionId = questionId;
 
             document.getElementById('questionNumber').textContent = `Question #${questionId}`;
             document.getElementById('questionIframe').src = `questions/${questionId}.html`;
@@ -2232,6 +2304,9 @@
             if (sidebar && sidebar.classList.contains('open')) {
                 renderQuestionsList();
             }
+
+            // Start timer for this question
+            startQuestionTimer();
         }
 
         // Navigation
@@ -2315,6 +2390,13 @@
             }
             if (!questionData[questionId].testId) {
                 questionData[questionId].testId = 'session_' + currentDate;
+            }
+
+            // Save testTime when manually marking
+            const timeSpent = getQuestionTimerMs();
+            if (timeSpent > 0) {
+                questionData[questionId].testTime = timeSpent.toString();
+                questionData[questionId].testId = questionId.toString();
             }
 
             const correctBtn = document.getElementById('correctBtn');
@@ -2434,6 +2516,9 @@
             if (currentResult && currentResult !== lastCheckedResult) {
                 lastCheckedResult = currentResult;
 
+                // Pause timer when answer is validated (Submit/Explanations clicked)
+                pauseQuestionTimer();
+
                 // Auto-mark correct or incorrect button
                 if (!questionData[questionId]) {
                     questionData[questionId] = {
@@ -2452,6 +2537,13 @@
                 } else if (currentResult === 'incorrect') {
                     questionData[questionId].isCorrect = false;
                     questionData[questionId].isIncorrect = true;
+                }
+
+                // Save testTime when answer is validated
+                const timeSpent = getQuestionTimerMs();
+                if (timeSpent > 0) {
+                    questionData[questionId].testTime = timeSpent.toString();
+                    questionData[questionId].testId = questionId.toString();
                 }
 
                 saveQuestionData();

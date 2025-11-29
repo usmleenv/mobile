@@ -329,11 +329,7 @@
     }
 
 </style>
-
-
-
-
-<details open>
+<details open="">
 <summary><strong>1067</strong><button class="bionic-reading-btn" onclick="toggleBionicReading(event)" title="Toggle Bionic Reading (Ctrl+B)"><span id="bionicIcon">👁️</span></button><button class="highlighter-btn" onclick="toggleHighlighter(event)" title="Toggle Highlighter (Ctrl+H)"><span id="highlighterIcon">🖊️</span></button></summary>
 <p class="" id="11c81b7f-4040-49fa-abef-1bd9f5bc94a0">A 23-year-old apparently
                                         healthy man who recently immigrated to the United States comes to an outpatient
@@ -419,7 +415,7 @@
 <ul class="bulleted-list" id="667990ed-4213-4ad9-bc4e-4bc5cbbbb20c">
 <li style="list-style-type:disc"></li>
 </ul>
-<figure class="image" id="608a366c-36a4-4404-bd58-1f1b1c760613"><a href="https://lh7-us.googleusercontent.com/66h_trxcaMDa-PPQQ-li5CYvFjRUTwYR0jJ6_G4qZlOnbVRorGfxlZtBvQ76wj0zM0qOv0A_1M78CVoALLjYDQO5k1S_U9BRvICvFZZJSwkNJTiB6OHuTVSOHT3_rQsd-Np5FHhuw9R2BaDZ3yRs5rQ"><img loading="lazy" src="https://lh7-us.googleusercontent.com/66h_trxcaMDa-PPQQ-li5CYvFjRUTwYR0jJ6_G4qZlOnbVRorGfxlZtBvQ76wj0zM0qOv0A_1M78CVoALLjYDQO5k1S_U9BRvICvFZZJSwkNJTiB6OHuTVSOHT3_rQsd-Np5FHhuw9R2BaDZ3yRs5rQ" style="width:602px"/></a>
+<figure class="image" id="608a366c-36a4-4404-bd58-1f1b1c760613"><a href="../Explanation Images/EXPLANATION 1067.png"><img loading="lazy" src="../Explanation Images/EXPLANATION 1067.png" style="width:602px"/></a>
 </figure>
 <p class="" id="e7c933d8-100b-4a97-8260-9bc21df33bae">This asymptomatic
                                                     patient with history of an inborn error of sugar metabolism most
@@ -479,24 +475,6 @@
 </li>
 </ul>
 </details>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 <style>
 .bionic-reading-btn {
     display: inline-flex;
@@ -682,6 +660,18 @@ summary {
         box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.2) !important;
     }
 
+    /* Eliminated choice styling */
+    tr.answer-choice.eliminated td {
+        text-decoration: line-through !important;
+        opacity: 0.5 !important;
+        color: #999 !important;
+    }
+
+    tr.answer-choice.eliminated:hover {
+        opacity: 0.7 !important;
+    }
+
+
 
     /* Answer Validation Styles */
     tr.answer-choice.answer-correct {
@@ -720,10 +710,19 @@ summary {
         box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.2) !important;
     }
 
+    /* Eliminated choice styling */
+    tr.answer-choice.eliminated td {
+        text-decoration: line-through !important;
+        opacity: 0.5 !important;
+        color: #999 !important;
+    }
+
+    tr.answer-choice.eliminated:hover {
+        opacity: 0.7 !important;
+    }
+
+
 </style>
-
-
-
 <script>
 let bionicEnabled = false;
 const originalContent = {};
@@ -822,7 +821,6 @@ document.addEventListener('keydown', function(e) {
     }
 });
 </script>
-
 <script>
     let highlighterActive = false;
     let questionHighlights = {};
@@ -965,13 +963,6 @@ document.addEventListener('keydown', function(e) {
         }
     });
 </script>
-
-
-
-
-
-
-
 <script>
 (function() {
     // Get question ID from summary
@@ -980,7 +971,7 @@ document.addEventListener('keydown', function(e) {
         return firstSummary ? firstSummary.textContent.trim() : '1';
     }
 
-    // Find the correct answer by highest percentage
+    // Find the correct answer using hybrid approach
     function findCorrectAnswer() {
         // Find the Submit or Explanation details element
         const submitDetails = Array.from(document.querySelectorAll('details')).find(d => {
@@ -990,7 +981,59 @@ document.addEventListener('keydown', function(e) {
 
         if (!submitDetails) return null;
 
-        // Find all answer rows with percentages inside Submit section
+        // METHOD 1: Search for explicit "correct answer X" or "The correct answer is X" text
+        const submitText = submitDetails.textContent;
+        const correctAnswerPatterns = [
+            /correct answer ([A-H])/i,  // Matches "Correct answer A" (standalone)
+            /correct answer is ([A-H])/i,
+            /correct answer: ([A-H])/i,
+            /the answer is ([A-H])/i,
+            /answer: ([A-H])/i
+        ];
+
+        for (const pattern of correctAnswerPatterns) {
+            const match = submitText.match(pattern);
+            if (match && match[1]) {
+                console.log('Found correct answer via text pattern:', match[1]);
+                return match[1].toUpperCase();
+            }
+        }
+
+        // METHOD 2: Compare each alternative's percentage with "X% Answered correctly" line
+        const answeredCorrectlyMatch = submitText.match(/(\d+)%\s*Answered correctly/i);
+        if (answeredCorrectlyMatch) {
+            const targetPercentage = parseInt(answeredCorrectlyMatch[1]);
+            console.log('Target percentage from "Answered correctly":', targetPercentage);
+
+            const table = submitDetails.querySelector('table.simple-table');
+            if (table) {
+                const rows = table.querySelectorAll('tr');
+
+                for (const row of rows) {
+                    const firstCell = row.querySelector('td:first-child');
+                    const secondCell = row.querySelector('td:nth-child(2)');
+
+                    if (firstCell && secondCell) {
+                        const choiceMatch = firstCell.textContent.trim().match(/^([A-E])\./);
+                        const percentMatch = secondCell.textContent.match(/(\d+)%/);
+
+                        if (choiceMatch && percentMatch) {
+                            const choice = choiceMatch[1];
+                            const percentage = parseInt(percentMatch[1]);
+
+                            // If this alternative's percentage matches the "Answered correctly" percentage
+                            if (percentage === targetPercentage) {
+                                console.log('Found correct answer via percentage matching:', choice);
+                                return choice;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // METHOD 3 (FALLBACK): Use highest percentage (old method)
+        console.log('Using fallback method: highest percentage');
         const table = submitDetails.querySelector('table.simple-table');
         if (!table) return null;
 
@@ -1117,7 +1160,6 @@ document.addEventListener('keydown', function(e) {
     }
 })();
 </script>
-
 <script>
 (function() {
     // Get question ID from summary
@@ -1220,6 +1262,12 @@ document.addEventListener('keydown', function(e) {
                             selectChoice(choice);
                         }
                     });
+                    // Add right-click handler for elimination
+                    row.addEventListener('contextmenu', function(e) {
+                        e.preventDefault();
+                        toggleElimination(choice);
+                    });
+
                 }
             });
         });
@@ -1227,6 +1275,89 @@ document.addEventListener('keydown', function(e) {
         // Load saved choice after a short delay
         setTimeout(loadSavedChoice, 100);
     }
+
+
+
+
+    // Toggle elimination of a choice (strikethrough)
+    function toggleElimination(choice) {
+        const questionId = getQuestionId();
+        const eliminatedKey = 'eliminated_q' + questionId;
+
+        // Get currently eliminated choices
+        let eliminated = [];
+        try {
+            const saved = localStorage.getItem(eliminatedKey);
+            if (saved) {
+                eliminated = JSON.parse(saved);
+            }
+        } catch (e) {
+            eliminated = [];
+        }
+
+        // Toggle this choice
+        const index = eliminated.indexOf(choice);
+        if (index > -1) {
+            // Remove from eliminated
+            eliminated.splice(index, 1);
+        } else {
+            // Add to eliminated
+            eliminated.push(choice);
+        }
+
+        // Save to localStorage
+        localStorage.setItem(eliminatedKey, JSON.stringify(eliminated));
+
+        // Update UI
+        updateEliminationUI();
+    }
+
+    // Update UI to show eliminated choices
+    function updateEliminationUI() {
+        const questionId = getQuestionId();
+        const eliminatedKey = 'eliminated_q' + questionId;
+
+        let eliminated = [];
+        try {
+            const saved = localStorage.getItem(eliminatedKey);
+            if (saved) {
+                eliminated = JSON.parse(saved);
+            }
+        } catch (e) {
+            eliminated = [];
+        }
+
+        // Apply strikethrough to eliminated choices
+        document.querySelectorAll('tr.answer-choice').forEach(row => {
+            const choice = row.getAttribute('data-choice');
+            if (eliminated.includes(choice)) {
+                row.classList.add('eliminated');
+            } else {
+                row.classList.remove('eliminated');
+            }
+        });
+    }
+
+    // Keyboard shortcuts for selecting answers
+    document.addEventListener('keydown', function(e) {
+        // Only if not typing in an input/textarea
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+            return;
+        }
+
+        // A, B, C, D, E keys (and F, G, H for questions with more options)
+        const key = e.key.toUpperCase();
+        if (/^[A-H]$/.test(key)) {
+            const choiceRow = document.querySelector(`tr.answer-choice[data-choice="${key}"]`);
+            if (choiceRow) {
+                e.preventDefault();
+                selectChoice(key);
+            }
+        }
+    });
+
+    // Load eliminated choices when page loads
+    setTimeout(updateEliminationUI, 150);
 
     // Run when page loads
     if (document.readyState === 'loading') {
@@ -1236,7 +1367,6 @@ document.addEventListener('keydown', function(e) {
     }
 })();
 </script>
-
 <script>
 (function() {
     // Get question ID from summary
@@ -1245,7 +1375,7 @@ document.addEventListener('keydown', function(e) {
         return firstSummary ? firstSummary.textContent.trim() : '1';
     }
 
-    // Find the correct answer by highest percentage
+    // Find the correct answer using hybrid approach
     function findCorrectAnswer() {
         // Find the Submit or Explanation details element
         const submitDetails = Array.from(document.querySelectorAll('details')).find(d => {
@@ -1255,7 +1385,59 @@ document.addEventListener('keydown', function(e) {
 
         if (!submitDetails) return null;
 
-        // Find all answer rows with percentages inside Submit section
+        // METHOD 1: Search for explicit "correct answer X" or "The correct answer is X" text
+        const submitText = submitDetails.textContent;
+        const correctAnswerPatterns = [
+            /correct answer ([A-H])/i,  // Matches "Correct answer A" (standalone)
+            /correct answer is ([A-H])/i,
+            /correct answer: ([A-H])/i,
+            /the answer is ([A-H])/i,
+            /answer: ([A-H])/i
+        ];
+
+        for (const pattern of correctAnswerPatterns) {
+            const match = submitText.match(pattern);
+            if (match && match[1]) {
+                console.log('Found correct answer via text pattern:', match[1]);
+                return match[1].toUpperCase();
+            }
+        }
+
+        // METHOD 2: Compare each alternative's percentage with "X% Answered correctly" line
+        const answeredCorrectlyMatch = submitText.match(/(\d+)%\s*Answered correctly/i);
+        if (answeredCorrectlyMatch) {
+            const targetPercentage = parseInt(answeredCorrectlyMatch[1]);
+            console.log('Target percentage from "Answered correctly":', targetPercentage);
+
+            const table = submitDetails.querySelector('table.simple-table');
+            if (table) {
+                const rows = table.querySelectorAll('tr');
+
+                for (const row of rows) {
+                    const firstCell = row.querySelector('td:first-child');
+                    const secondCell = row.querySelector('td:nth-child(2)');
+
+                    if (firstCell && secondCell) {
+                        const choiceMatch = firstCell.textContent.trim().match(/^([A-E])\./);
+                        const percentMatch = secondCell.textContent.match(/(\d+)%/);
+
+                        if (choiceMatch && percentMatch) {
+                            const choice = choiceMatch[1];
+                            const percentage = parseInt(percentMatch[1]);
+
+                            // If this alternative's percentage matches the "Answered correctly" percentage
+                            if (percentage === targetPercentage) {
+                                console.log('Found correct answer via percentage matching:', choice);
+                                return choice;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // METHOD 3 (FALLBACK): Use highest percentage (old method)
+        console.log('Using fallback method: highest percentage');
         const table = submitDetails.querySelector('table.simple-table');
         if (!table) return null;
 
@@ -1382,7 +1564,6 @@ document.addEventListener('keydown', function(e) {
     }
 })();
 </script>
-
 <script>
 (function() {
     // Get question ID from summary
@@ -1391,7 +1572,7 @@ document.addEventListener('keydown', function(e) {
         return firstSummary ? firstSummary.textContent.trim() : '1';
     }
 
-    // Find the correct answer by highest percentage
+    // Find the correct answer using hybrid approach
     function findCorrectAnswer() {
         // Find the Submit or Explanation details element
         const submitDetails = Array.from(document.querySelectorAll('details')).find(d => {
@@ -1401,7 +1582,59 @@ document.addEventListener('keydown', function(e) {
 
         if (!submitDetails) return null;
 
-        // Find all answer rows with percentages inside Submit section
+        // METHOD 1: Search for explicit "correct answer X" or "The correct answer is X" text
+        const submitText = submitDetails.textContent;
+        const correctAnswerPatterns = [
+            /correct answer ([A-H])/i,  // Matches "Correct answer A" (standalone)
+            /correct answer is ([A-H])/i,
+            /correct answer: ([A-H])/i,
+            /the answer is ([A-H])/i,
+            /answer: ([A-H])/i
+        ];
+
+        for (const pattern of correctAnswerPatterns) {
+            const match = submitText.match(pattern);
+            if (match && match[1]) {
+                console.log('Found correct answer via text pattern:', match[1]);
+                return match[1].toUpperCase();
+            }
+        }
+
+        // METHOD 2: Compare each alternative's percentage with "X% Answered correctly" line
+        const answeredCorrectlyMatch = submitText.match(/(\d+)%\s*Answered correctly/i);
+        if (answeredCorrectlyMatch) {
+            const targetPercentage = parseInt(answeredCorrectlyMatch[1]);
+            console.log('Target percentage from "Answered correctly":', targetPercentage);
+
+            const table = submitDetails.querySelector('table.simple-table');
+            if (table) {
+                const rows = table.querySelectorAll('tr');
+
+                for (const row of rows) {
+                    const firstCell = row.querySelector('td:first-child');
+                    const secondCell = row.querySelector('td:nth-child(2)');
+
+                    if (firstCell && secondCell) {
+                        const choiceMatch = firstCell.textContent.trim().match(/^([A-E])\./);
+                        const percentMatch = secondCell.textContent.match(/(\d+)%/);
+
+                        if (choiceMatch && percentMatch) {
+                            const choice = choiceMatch[1];
+                            const percentage = parseInt(percentMatch[1]);
+
+                            // If this alternative's percentage matches the "Answered correctly" percentage
+                            if (percentage === targetPercentage) {
+                                console.log('Found correct answer via percentage matching:', choice);
+                                return choice;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // METHOD 3 (FALLBACK): Use highest percentage (old method)
+        console.log('Using fallback method: highest percentage');
         const table = submitDetails.querySelector('table.simple-table');
         if (!table) return null;
 
@@ -1528,7 +1761,6 @@ document.addEventListener('keydown', function(e) {
     }
 })();
 </script>
-
 <script>
 (function() {
     // Get question ID from summary
@@ -1537,7 +1769,7 @@ document.addEventListener('keydown', function(e) {
         return firstSummary ? firstSummary.textContent.trim() : '1';
     }
 
-    // Find the correct answer by highest percentage
+    // Find the correct answer using hybrid approach
     function findCorrectAnswer() {
         // Find the Submit or Explanation details element
         const submitDetails = Array.from(document.querySelectorAll('details')).find(d => {
@@ -1547,7 +1779,59 @@ document.addEventListener('keydown', function(e) {
 
         if (!submitDetails) return null;
 
-        // Find all answer rows with percentages inside Submit section
+        // METHOD 1: Search for explicit "correct answer X" or "The correct answer is X" text
+        const submitText = submitDetails.textContent;
+        const correctAnswerPatterns = [
+            /correct answer ([A-H])/i,  // Matches "Correct answer A" (standalone)
+            /correct answer is ([A-H])/i,
+            /correct answer: ([A-H])/i,
+            /the answer is ([A-H])/i,
+            /answer: ([A-H])/i
+        ];
+
+        for (const pattern of correctAnswerPatterns) {
+            const match = submitText.match(pattern);
+            if (match && match[1]) {
+                console.log('Found correct answer via text pattern:', match[1]);
+                return match[1].toUpperCase();
+            }
+        }
+
+        // METHOD 2: Compare each alternative's percentage with "X% Answered correctly" line
+        const answeredCorrectlyMatch = submitText.match(/(\d+)%\s*Answered correctly/i);
+        if (answeredCorrectlyMatch) {
+            const targetPercentage = parseInt(answeredCorrectlyMatch[1]);
+            console.log('Target percentage from "Answered correctly":', targetPercentage);
+
+            const table = submitDetails.querySelector('table.simple-table');
+            if (table) {
+                const rows = table.querySelectorAll('tr');
+
+                for (const row of rows) {
+                    const firstCell = row.querySelector('td:first-child');
+                    const secondCell = row.querySelector('td:nth-child(2)');
+
+                    if (firstCell && secondCell) {
+                        const choiceMatch = firstCell.textContent.trim().match(/^([A-E])\./);
+                        const percentMatch = secondCell.textContent.match(/(\d+)%/);
+
+                        if (choiceMatch && percentMatch) {
+                            const choice = choiceMatch[1];
+                            const percentage = parseInt(percentMatch[1]);
+
+                            // If this alternative's percentage matches the "Answered correctly" percentage
+                            if (percentage === targetPercentage) {
+                                console.log('Found correct answer via percentage matching:', choice);
+                                return choice;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // METHOD 3 (FALLBACK): Use highest percentage (old method)
+        console.log('Using fallback method: highest percentage');
         const table = submitDetails.querySelector('table.simple-table');
         if (!table) return null;
 

@@ -2189,6 +2189,50 @@
             }
         }
 
+        // Helper function to find which system a question belongs to
+        function getSystemForQuestionId(qId) {
+            for (const system in window.topics) {
+                for (const topic in window.topics[system]) {
+                    if (window.topics[system][topic].includes(qId)) {
+                        return system;
+                    }
+                }
+            }
+            return null; // Question not found in any system
+        }
+
+        // Test History Functions
+        function saveTestToHistory(questionIds) {
+            const history = JSON.parse(localStorage.getItem('testHistory') || '[]');
+
+            // Group questions by system
+            const systemBreakdown = {};
+            questionIds.forEach(qId => {
+                const system = getSystemForQuestionId(qId);
+                if (system) {
+                    if (!systemBreakdown[system]) {
+                        systemBreakdown[system] = [];
+                    }
+                    systemBreakdown[system].push(qId);
+                }
+            });
+
+            const testEntry = {
+                id: 'test_' + Date.now(),
+                questionIds: questionIds,
+                date: new Date().toISOString(),
+                questionCount: questionIds.length,
+                totalTime: 0, // Will be updated when test finishes
+                timePerQuestion: 0, // Will be updated when test finishes
+                systemBreakdown: systemBreakdown, // Store which questions belong to which system
+                timeBySystem: {}, // Will be updated when test finishes
+                startTime: Date.now() // Track when test started
+            };
+
+            history.push(testEntry);
+            localStorage.setItem('testHistory', JSON.stringify(history));
+        }
+
         // Start test with subtopic
         function startTest(systemName, categoryName) {
             if (!window.topics || !window.topics[systemName]) {
@@ -2205,6 +2249,11 @@
             currentSubtopic = { system: systemName, category: categoryName };
             currentQuestions = questions;
             currentQuestionIndex = 0;
+
+            // Automatically create a test history entry when starting a test
+            if (questions && questions.length > 0) {
+                saveTestToHistory(questions);
+            }
 
             loadQuestion(0);
             switchView('question');
@@ -3024,6 +3073,39 @@
                 });
             }
         }
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            // Only if not typing in an input/textarea
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+                return;
+            }
+
+            // Space or P key toggles timer pause/resume
+            if (e.key === ' ' || e.key.toLowerCase() === 'p') {
+                e.preventDefault();
+                if (questionTimerRunning) {
+                    pauseQuestionTimer();
+                } else {
+                    resumeQuestionTimer();
+                }
+                return;
+            }
+
+            // A, B, C, D, E keys for selecting answers (send to iframe)
+            const key = e.key.toUpperCase();
+            if (/^[A-H]$/.test(key)) {
+                const iframe = document.getElementById('questionIframe');
+                if (iframe && iframe.contentWindow) {
+                    e.preventDefault();
+                    // Send message to iframe to select the choice
+                    iframe.contentWindow.postMessage({
+                        type: 'selectChoice',
+                        choice: key
+                    }, '*');
+                }
+            }
+        });
 
         // Start initialization
         if (document.readyState === 'loading') {
